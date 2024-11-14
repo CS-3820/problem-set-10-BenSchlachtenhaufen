@@ -206,7 +206,7 @@ bubble; this won't *just* be `Throw` and `Catch.
 -------------------------------------------------------------------------------}
 
 smallStep :: (Expr, Expr) -> Maybe (Expr, Expr)
--- `Const` is already a value, so we do nothing
+-- `Const` is already a value, so nothing to do
 smallStep (Const n, acc) = Nothing
 
 -- `Plus` with two constant values: perform the arithmetic
@@ -221,8 +221,8 @@ smallStep (Plus (Const n) e2, acc)
   | not (isValue e2) = case smallStep (e2, acc) of
                          Just (e2', acc') -> Just (Plus (Const n) e2', acc')
                          Nothing -> Nothing
--- Problem 4
--- `Store` with a non-value expression: evaluate it
+
+-- Handle `Store` with a non-value expression: evaluate it
 smallStep (Store e, acc)
   | not (isValue e) = case smallStep (e, acc) of
                          Just (e', acc') -> Just (Store e', acc')
@@ -230,8 +230,11 @@ smallStep (Store e, acc)
 -- `Store` with a value: update the accumulator
 smallStep (Store (Const n), _) = Just (Const n, Const n)
 
--- `Recall` simply retrieves the current accumulator
+-- `Recall` retrieves the current accumulator
 smallStep (Recall, acc) = Just (acc, acc)
+
+-- If there's any other case that hasn't been handled explicitly
+smallStep _ = Nothing
 
 steps :: (Expr, Expr) -> [(Expr, Expr)]
 steps s = case smallStep s of
