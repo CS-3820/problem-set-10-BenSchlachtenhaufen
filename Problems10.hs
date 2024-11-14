@@ -108,7 +108,11 @@ subst x m (Var y)
   | otherwise = Var y
 subst x m (Lam y n) = Lam y (substUnder x m y n)
 subst x m (App n1 n2) = App (subst x m n1) (subst x m n2)
-subst x m n = undefined
+subst x m (Store n) = Store (subst x m n)  -- Substitute within the stored expression
+subst _ _ Recall = Recall                  -- No substitution needed for Recall
+subst x m (Throw n) = Throw (subst x m n)  -- Substitute within the thrown expression
+subst x m (Catch n1 y n2) = 
+  Catch (subst x m n1) y (substUnder x m y n2)  -- Substitute within both main and catch expressions
 
 {-------------------------------------------------------------------------------
 
