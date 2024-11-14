@@ -206,7 +206,21 @@ bubble; this won't *just* be `Throw` and `Catch.
 -------------------------------------------------------------------------------}
 
 smallStep :: (Expr, Expr) -> Maybe (Expr, Expr)
-smallStep = undefined
+-- `Const` is already a value, so we do nothing
+smallStep (Const n, acc) = Nothing
+
+-- `Plus` with two constant values: perform the arithmetic
+smallStep (Plus (Const n1) (Const n2), acc) = Just (Const (n1 + n2), acc)
+-- `Plus` with left side not yet a value: evaluate it
+smallStep (Plus e1 e2, acc)
+  | not (isValue e1) = case smallStep (e1, acc) of
+                         Just (e1', acc') -> Just (Plus e1' e2, acc')
+                         Nothing -> Nothing
+-- `Plus` with right side not yet a value: evaluate it
+smallStep (Plus (Const n) e2, acc)
+  | not (isValue e2) = case smallStep (e2, acc) of
+                         Just (e2', acc') -> Just (Plus (Const n) e2', acc')
+                         Nothing -> Nothing
 
 steps :: (Expr, Expr) -> [(Expr, Expr)]
 steps s = case smallStep s of
