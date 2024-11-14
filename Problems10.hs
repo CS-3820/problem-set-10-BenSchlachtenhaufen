@@ -206,34 +206,42 @@ bubble; this won't *just* be `Throw` and `Catch.
 -------------------------------------------------------------------------------}
 
 smallStep :: (Expr, Expr) -> Maybe (Expr, Expr)
--- `Const` is already a value, so nothing to do
+-- Handling values and basic arithmetic (remains the same)
 smallStep (Const n, acc) = Nothing
-
--- `Plus` with two constant values: perform the arithmetic
 smallStep (Plus (Const n1) (Const n2), acc) = Just (Const (n1 + n2), acc)
--- `Plus` with left side not yet a value: evaluate it
+
+-- Left-hand side of `Plus` is not yet a value: evaluate it
 smallStep (Plus e1 e2, acc)
   | not (isValue e1) = case smallStep (e1, acc) of
                          Just (e1', acc') -> Just (Plus e1' e2, acc')
                          Nothing -> Nothing
--- `Plus` with right side not yet a value: evaluate it
+-- Right-hand side of `Plus` is not yet a value: evaluate it
 smallStep (Plus (Const n) e2, acc)
   | not (isValue e2) = case smallStep (e2, acc) of
                          Just (e2', acc') -> Just (Plus (Const n) e2', acc')
                          Nothing -> Nothing
 
--- Handle `Store` with a non-value expression: evaluate it
+-- If a `Throw` is encountered on the left-hand side of `Plus`, it bubbles up
+smallStep (Plus (Throw e) _, acc) = Just (Throw e, acc)
+-- If a `Throw` is encountered on the right-hand side of `Plus`, it bubbles up
+smallStep (Plus _ (Throw e), acc) = Just (Throw e, acc)
+
+-- Handling `Throw` with call-by-value: ensure the exception is a value first
+smallStep (Throw e, acc)
+  | not (isValue e) = case smallStep (e, acc) of
+                         Just (e', acc') -> Just (Throw e', acc')
+                         Nothing -> Nothing
+
+-- Catch isn't involved here, but must have its own handling if implemented
+-- `Store` and `Recall` cases remain the same
 smallStep (Store e, acc)
   | not (isValue e) = case smallStep (e, acc) of
                          Just (e', acc') -> Just (Store e', acc')
                          Nothing -> Nothing
--- `Store` with a value: update the accumulator
 smallStep (Store (Const n), _) = Just (Const n, Const n)
-
--- `Recall` retrieves the current accumulator
 smallStep (Recall, acc) = Just (acc, acc)
 
--- If there's any other case that hasn't been handled explicitly
+-- If nothing matches, we return `Nothing` to ensure completeness
 smallStep _ = Nothing
 
 steps :: (Expr, Expr) -> [(Expr, Expr)]
