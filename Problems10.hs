@@ -221,6 +221,17 @@ smallStep (Plus (Const n) e2, acc)
   | not (isValue e2) = case smallStep (e2, acc) of
                          Just (e2', acc') -> Just (Plus (Const n) e2', acc')
                          Nothing -> Nothing
+-- Problem 4
+-- `Store` with a non-value expression: evaluate it
+smallStep (Store e, acc)
+  | not (isValue e) = case smallStep (e, acc) of
+                         Just (e', acc') -> Just (Store e', acc')
+                         Nothing -> Nothing
+-- `Store` with a value: update the accumulator
+smallStep (Store (Const n), _) = Just (Const n, Const n)
+
+-- `Recall` simply retrieves the current accumulator
+smallStep (Recall, acc) = Just (acc, acc)
 
 steps :: (Expr, Expr) -> [(Expr, Expr)]
 steps s = case smallStep s of
