@@ -206,42 +206,56 @@ bubble; this won't *just* be `Throw` and `Catch.
 -------------------------------------------------------------------------------}
 
 smallStep :: (Expr, Expr) -> Maybe (Expr, Expr)
--- Handling values and basic arithmetic (remains the same)
+-- `Const` is already a value, so we do nothing
 smallStep (Const n, acc) = Nothing
-smallStep (Plus (Const n1) (Const n2), acc) = Just (Const (n1 + n2), acc)
 
--- Left-hand side of `Plus` is not yet a value: evaluate it
+-- `Plus` with two constant values: perform the arithmetic
+smallStep (Plus (Const n1) (Const n2), acc) = Just (Const (n1 + n2), acc)
+-- `Plus` with left side not yet a value: evaluate it
 smallStep (Plus e1 e2, acc)
   | not (isValue e1) = case smallStep (e1, acc) of
                          Just (e1', acc') -> Just (Plus e1' e2, acc')
                          Nothing -> Nothing
--- Right-hand side of `Plus` is not yet a value: evaluate it
+-- `Plus` with right side not yet a value: evaluate it
 smallStep (Plus (Const n) e2, acc)
   | not (isValue e2) = case smallStep (e2, acc) of
                          Just (e2', acc') -> Just (Plus (Const n) e2', acc')
                          Nothing -> Nothing
+-- `Plus` encountering an exception: bubble it up
+smallStep (Plus _ (Throw v), acc) = Just (Throw v, acc)
+smallStep (Plus (Throw v) _, acc) = Just (Throw v, acc)
 
--- If a `Throw` is encountered on the left-hand side of `Plus`, it bubbles up
-smallStep (Plus (Throw e) _, acc) = Just (Throw e, acc)
--- If a `Throw` is encountered on the right-hand side of `Plus`, it bubbles up
-smallStep (Plus _ (Throw e), acc) = Just (Throw e, acc)
-
--- Handling `Throw` with call-by-value: ensure the exception is a value first
-smallStep (Throw e, acc)
-  | not (isValue e) = case smallStep (e, acc) of
-                         Just (e', acc') -> Just (Throw e', acc')
-                         Nothing -> Nothing
-
--- Catch isn't involved here, but must have its own handling if implemented
--- `Store` and `Recall` cases remain the same
+-- `Store` with a non-value expression: evaluate it
 smallStep (Store e, acc)
   | not (isValue e) = case smallStep (e, acc) of
                          Just (e', acc') -> Just (Store e', acc')
                          Nothing -> Nothing
+-- `Store` with a value: update the accumulator
 smallStep (Store (Const n), _) = Just (Const n, Const n)
+
+-- `Recall` simply retrieves the current accumulator
 smallStep (Recall, acc) = Just (acc, acc)
 
--- If nothing matches, we return `Nothing` to ensure completeness
+-- `Throw` with a non-value expression: evaluate it
+smallStep (Throw e, acc)
+  | not (isValue e) = case smallStep (e, acc) of
+                         Just (e', acc') -> Just (Throw e', acc')
+                         Nothing -> Nothing
+-- `Throw` with a value is an exception that needs to bubble
+smallStep (Throw v, acc) = Nothing
+
+-- `Catch` with a non-value expression: evaluate it
+smallStep (Catch e1 x e2, acc)
+  | not (isValue e1) = case smallStep (e1, acc) of
+                         Just (e1', acc') -> Just (Catch e1' x e2, acc')
+                         Nothing -> Nothing
+-- `Catch` with a value: no exception, return the value
+smallStep (Catch v x _, acc) 
+  | isValue v = Just (v, acc)
+-- `Catch` encountering a thrown exception: perform substitution
+smallStep (Catch (Throw w) x e2, acc) = Just (subst x w e2, acc)
+
+-- No other cases match; return Nothing
 smallStep _ = Nothing
 
 steps :: (Expr, Expr) -> [(Expr, Expr)]
